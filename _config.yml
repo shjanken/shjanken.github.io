@@ -1,0 +1,12 @@
+name: shjanken 
+description: 记录学习 记录生活 记录成长 记录点滴
+meta_description: "focus on linux server technology"
+
+markdown: redcarpet
+pygments: true
+logo: false
+paginate: 15
+
+# Details for the RSS feed generator
+url:            'http://shjanken.github.io'
+author:         'shjanken'
