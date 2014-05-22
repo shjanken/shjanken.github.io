@@ -1,7 +1,5 @@
 name: shjanken 
-description: 记录学习 记录生活 记录成长 记录点滴
-meta_description: "focus on linux server technology"
-
+description: I WRITE CODE. FOR THE BEST LIFE! 
 markdown: redcarpet
 redcarpet:
   extensions: ["no_intra_emphasis", "fenced_code_blocks", "autolink", "strikethrough", "superscript"]
