@@ -1,7 +1,6 @@
 ---
-layout: post
-title: SaltStack 学习笔记
-category: linux 管理工具
+  layout: post
+  title: SaltStack 学习笔记
 ---
 
 之前在培训机构学习了`Puppet`, 但是由于 `Puppet` 是使用 `Ruby` 语言开发的，所以学习的时候发现资源文件的配置管理等非常麻烦，语法等等也不习惯，所以对精研 `Puppet` 一直提不起兴趣。希望能有一款使用我熟悉的语言开发的，方便安装和配置的管理软件。
