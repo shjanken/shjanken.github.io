@@ -23,10 +23,12 @@
     默认情况下无需修改配置
 
 - 启动`master`服务： 
+    
         service salt-master start
         chkconfig salt-master on //开机启动服务
     
 - 启动`minion`服务：
+
         service salt-minion start
         chkconfig salt-minion on //开机启动服务
 
