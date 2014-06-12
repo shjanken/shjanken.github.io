@@ -1,7 +1,7 @@
-# vim的CTRLP插件功能
-
-标签（空格分隔）： vim
-
+---
+layout: post
+title: "vim的CTRLP插件功能"
+category: linux vim
 ---
 
  1. 在启动`ctrl p`插件之后可以创建不存在的目录和文件。具体只要输入路径和文件名之后试用`ctrl+y`快捷键。
