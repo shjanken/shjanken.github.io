@@ -1,0 +1,335 @@
+----sqlplus的常用设置
+使用set sqlprompt
+sql> set sqlprompt '&_user@_connect_identifier'
+
+set linesize 400;
+column EMPLOYEE_ID format 999999 heading 'emp_id';
+column FIRST_NAME format a20;
+column LAST_NAME format a25;
+column EMAIL format a25;
+column PHONE_NUMBER format a20 heading 'phone';
+column SALARY  format 999999.99;
+column COMMISSION_PCT like salary format 99.99 heading 'cmm_pct';
+COLUMN column_name CLEAR    --清楚已设置列属性
+CLEAR COLUMNS               --重设所有列属性
+COLUMN DUMMY NOPRINT;  
+COMPUTE SUM OF SALARY ON DUMMY; 
+BREAK ON dummy;
+
+select DEPARTMENT_ID,SALARY, null dummy from employees 
+
+
+查看sga中buffer cache的命中率
+ select name, round((1 - (physical_reads / (db_block_gets + consistent_gets)))*100) || '%' ratio 
+from v$buffer_pool_statistics
+where db_block_gets + consistent_get > 0 
+
+查看shared pool 的命中率
+select to_char(sum(pins-reloads)/sum(pins)*100,'99.99')||'%' from v$librarycache;
+
+
+查看各个动态内存组件的大小
+select component,current_size,min_size,max_size from v$memory_dynamic_components;
+
+计算SGA，通过shared pool，streams pool，java pool，large pool，buffer cache，
+ASM Buffer Cache参数求和，计算得出当前SGA使用的大小（314572800）。
+
+
+sqlplus 查看错误代码的命令
+sql> !oerr ora 1521
+
+----参数文件
+如果一个数据库有多个参数文件，可以用以下命令查看使用的哪个参数文件
+sql>show parameter spfile;
+如果结果为空，则表示使用pfile。否则会显示实际spile的路径。
+
+alter system set pga_aggregate_target=100M comment='test comment' scope=both;
+
+查看参数
+sql> show parameter sga
+或者
+查看视图v$spparameter 
+select value, update_comment from v$spparameter where name='shared_pool_size';
+
+transactions=(1.1 * SESSIONS) or transactions=(1.1 * ((1.5 * PROCESSES) + 22)) 
+sessions=(1.5 * PROCESSES) + 22
+
+数据字典表
+	通过create database是通过调用sql.bsq文件创建的。该文件位于$ORACLE_HOME/rdbms/admin目录，我们可以发现大部分的数据字典表几乎都是以$结尾，比如col$,tab$
+
+oracle 提供一系列的数据字典视图对数据字典表进行包装
+dictionary视图包含了全部的数据字典视图信息
+dba_views 包含了数据库中所有视图的定义信息
+sql> set long 10000000000
+sql> set pages 999
+sql> select text, from dba_views where view_name='DBA_TABLES';
+
+动态性能视图
+	就是将内存里的数据或控制文件里的数据以表的形式展现出来。它们实际都是虚表，并不是真正的表。只是让我们更好的了解数据库的性能。
+所有动态性能视图的名称都存在v$fixed_table里，而这些动态视图都是以v_$开头，属主是sys。oracle为每个动态性能视图都创建了同名词，同名词
+则是将中间的“_”去掉了，都是以v$开头。我们以v$session为例
+select owner, synonym_name, table_owner, table_name from dba_synonyms where synonym_name='V$SESSION';
+
+
+共享连接的配置
+第一步 设置初始的dispatchers 数量
+sql>alter system set dispatchers='(PROTOCOL=TCP)(dispatchers=3)';
+
+第二步 设置最大的dispatchers 数量
+SQL> alter system set max_shared_servers=5;
+
+第三步 设置初始的共享服务器进程数量
+SQL> alter system set shared_servers =5；
+
+第四步 设置共享服务器进程数量上限
+SQL> alter system set max_shared_servers=8；
+
+第五步 设置能同时使用共享连接的session个数
+SQL> alter system set shared_server_sessions=3；
+
+第六步 tnsnames.ora的配置
+orcl= 
+ (DESCRIPTION= 
+   (ADDRESS_LIST=
+     (ADDRESS=(PROTOCOL=tcp)(HOST=127.0.0.1)(PORT=1521))
+   (CONNECT_DATA=
+     (SERVICE_NAME=orcl))
+	 )
+  )
+
+
+【11g新特性】sec_max_failed_login_attempts (默认为10，范围为1到unlimited)这个参数以11g 新特性形式引入， 文档对它的描述是
+SEC_MAX_FAILED_LOGIN_ATTEMPTS specifies the number of authentication attempts that can be made by a client on a connection to the server process. After the specified number of failure attempts, the connection will be automatically dropped by the server process.
+ 
+但是有同学怎么测试都无法生效， 实际该参数只对使用了OCI 的特定程序生效，而使用SQLPLUS是无法生效的， 坑爹的新特性：
+ 
+SEC_MAX_FAILED_LOGIN_ATTEMPTS only works application uses OCI Program.SEC_MAX_FAILED_LOGIN_ATTEMPTS not work in sqlplus.
+OCI Program have the following ,it wil work.
+1.You need to use OCI_THREADED mode.
+2.You need to set the attribute ofserver, username, password attributes in the appropriate handles:
+3.You need to useOCISessionBegin to connect to the database
+
+
+数据库启动和关闭
+
+shutdown normal 等待所有连接结束，不会主动终止现有连接。不允许新的连接进来
+shutdown transaction 等待所有事务结束，不会主动终止现有的事务。不允许开启新的事务。不允许新的连接进来
+shutdown immediate 结束所有的事务。 
+shutdown abort ABORT：在关闭之前执行的任务最少。由于此模式需要在启动之前进行恢复，因此只在需要时才使用此模式。
+
+
+
+
+SET LINESIZE 100  
+COLUMN spid FORMAT A10  
+COLUMN username FORMAT A10  
+COLUMN program FORMAT A45  
+  
+SELECT s.sid, --Session identifier  
+       s.serial#,--Session serial number. Used to uniquely identify a session's objects.  
+       p.spid, --Operating system process identifier  
+       p.pid, --Oracle process identifier  
+       s.username,--Oracle DB username  
+       s.osuser,--Operating system client user name  
+       s.TERMINAL,--Operating system terminal name  
+       s.program,--Operating system program name  
+       s.STATUS--Status of the session.ACTIVE,INACTIVE,KILLED,CACHED,SNIPED     
+FROM   v$session s,v$process p  
+WHERE   p.addr = s.paddr  
+AND s.type != 'BACKGROUND';  
+
+
+-----ADR
+从Oracle Database11g R1 开始，将忽略传统的…_DUMP_DEST 初始化参数。ADR 根目录又称为ADR 基目录，其位置由DIAGNOSTIC_DEST 初始化参数设定。如果省略此参数或将其保留为空，数据库将在启动时按如下方式设置DIAGNOSTIC_DEST：
+如果已设置了环境变量ORACLE_BASE，则将DIAGNOSTIC_DEST 设置为$ORACLE_BASE。
+如果未设置环境变量ORACLE_BASE，则将DIAGNOSTIC_DEST 设置为$ORACLE_HOME/log。
+
+诊断数据				以前位置				ADR位置
+前台进程跟踪文件	 user_dump_dest			 $ADR_HOME/trace
+后台进程跟踪文件	 background_dump_dest	 $ADR_HOME/trace
+预警日志数据    	 background_dump_dest	 $ADR_HOME/alert&trace
+核心转储 	 		 core_dump_dest			 $ADR_HOME/cdump
+意外事件转储 	 	 core_dump_dest			 $ADR_HOME/incident/incdir_n
+					 user_dump_dest
+					 
+
+使用ADRCI查看预警日志
+$adrci
+adrci> show home
+ADR Homes: 
+diag/clients/user_oracle/host_3349125520_80
+diag/clients/user_oracle/host_61728193_80
+diag/tnslsnr/myos/listener
+diag/tnslsnr/localhost/listener
+diag/rdbms/orcl/orcl
+
+adrci>show alert
+Choose the alert log from the following homes to view:
+
+1: diag/clients/user_oracle/host_3349125520_80
+2: diag/clients/user_oracle/host_61728193_80
+3: diag/tnslsnr/myos/listener
+4: diag/tnslsnr/localhost/listener
+5: diag/rdbms/orcl/orcl
+Q: to quit
+
+adrci> show alert -tail
+DIA-48449: Tail alert can only apply to single ADR home
+
+adrci> set home diag/rdbms/orcl/orcl
+adrci>  show alert -tail -f
+类似的，我们可以
+show alert -tail (默认是10条条目)
+show alert -tail -20(显示最后20个条目)
+show alert -tail -f(类似tail -f alertlog一样)
+show alert(windows中会弹出txt文本窗口显示，如已经装了MKS Toolkit，希望用vi显示，则需要先set editor vi，再show alert。)
+show alert -p "MESSAGE_TEXT like '%ORA-%'"(显示alert中关于ORA-报错的内容。其他更多的show alert的选项，可见 help show alert)
+
+
+模拟一个incident
+sql> conn hr/oracle
+SQL> create table test as select * from user_tables;
+SQL> select OBJECT_NAME,OBJECT_ID,DATA_OBJECT_ID from dba_objects where owner='HR' and object_name='TEST';
+SQL> update sys.tab$ set OBJ# = 999999 where OBJ# = 95801;
+SQL> conn / as sysdba
+SQL> alter system checkpoint;
+SQL> STARTUP FORCE;
+SQL> conn hr/oracle
+Connected.
+SQL> desc test
+
+adrci>  show problem
+adrci> show incident
+
+
+-------tablespace
+oracle 支持两种类型的表空间smallfile tablespace 和bigfile  tablespace.
+ 大文件表空间只能包含一个文件，数据文件可以达到 4G 个数据块大小，总容量可以达到 8EB（1EB=1024PB）
+每个数据库都有一个默认的表空间类型，使用下面的sql语句查询
+SELECT * database_properties WHERE property_name = 'DEFAULT_TBS_TYPE';
+
+create tablespace tbs1 datafile '/u01/app/product/oradata/orcl/tbs021.dbf' size 10M autoextend on maxsize 20M extent management local uniform size 1M segment space management auto;
+
+create tablespace tbs2 datafile '/u01/app/product/oradata/orcl/tbs021.dbf' size 10M autoextend off  extent management local uniform size 1M segment space management auto;
+
+----------Temporary Tablespaces
+每个数据库都一个有默认的临时表空间。作为用户的排序，创建索引和创建临时表等操作的临时场所。
+
+CREATE TEMPORARY TABLESPACE lmtemp TEMPFILE '/u02/oracle/data/lmtemp01.dbf'  SIZE 20M REUSE EXTENT MANAGEMENT LOCAL UNIFORM SIZE 16M;
+
+临时表空间组的概念
+
+SELECT PROPERTY_NAME, PROPERTY_VALUE FROM DATABASE_PROPERTIES WHERE
+   PROPERTY_NAME='DEFAULT_TEMP_TABLESPACE';
+
+
+select file_name,tablespace_name from dba_temp_files;
+create temporary tablespace temp03 tempfile '/u01/app/product/oradata/orcl/temp03.dbf' size 20M autoextend off tablespace group temp_group01;
+alter tablespace temp tablespace group temp_group01;
+
+从临时表空间组 中去掉临时表空间；
+alter tablespace temp03 tablespace group '';
+
+把临时表空间组设置为数据库默认的临时 表空间 组；
+ALTER DATABASE DEFAULT TEMPORARY TABLESPACE TEMP_GROUP01;
+
+
+角色管理
+CREATE ROLE "T_ROLE" ;
+GRANT DELETE ON "SH"."CHANNELS" TO "T_ROLE"; 
+GRANT INSERT ON "SH"."CHANNELS" TO "T_ROLE" ;
+GRANT SELECT ON "SH"."CHANNELS" TO "T_ROLE" ;
+GRANT DELETE ON "SH"."COSTS" TO "T_ROLE"    ;
+GRANT INSERT ON "SH"."COSTS" TO "T_ROLE     ;
+GRANT SELECT ON "SH"."COSTS" TO "T_ROLE"   ;
+GRANT DELETE ON "SH"."COUNTRIES" TO "T_ROLE";
+GRANT INSERT ON "SH"."COUNTRIES" TO "T_ROLE";
+GRANT SELECT ON "SH"."COUNTRIES" TO "T_ROLE";
+GRANT DELETE ON "SH"."CUSTOMERS" TO "T_ROLE";
+GRANT INSERT ON "SH"."CUSTOMERS" TO "T_ROLE";
+GRANT SELECT ON "SH"."CUSTOMERS" TO "T_ROLE";
+GRANT DELETE ON "SH"."DIMENSION_EXCEPTIONS" TO "T_ROLE";
+GRANT INSERT ON "SH"."DIMENSION_EXCEPTIONS" TO "T_ROLE";
+GRANT SELECT ON "SH"."DIMENSION_EXCEPTIONS" TO "T_ROLE";
+
+grant "T_ROLE" TO HR;
+grant select on "SH"."COSTS" to hr;
+
+ 
+
+
+profile 
+-----------
+SQL> set lines 140
+SQL> column profile format a30
+SQL> column resource_name format a30
+SQL> column resource_type like profile
+SQL> column limit format a40
+SQL> select * from dba_profiles;
+
+failed_login_attempts
+failed_login_attempts指定在帐户被锁定之前所允许尝试登陆的的最大次数。
+
+SQL> select * from dba_profiles where profile='DEFAULT' and resource_name='FAILED_LOGIN_ATTEMPTS';
+PROFILE    RESOURCE_NAME                    RESOURCE LIMIT
+---------- -------------------------------- -------- ----------
+DEFAULT    FAILED_LOGIN_ATTEMPTS            PASSWORD 10
+
+SQL> alter profile default limit FAILED_LOGIN_ATTEMPTS 3;
+
+password_lock_time指定帐户被锁定的天数. 1/24/60对应的是1分钟. 但是, 1分钟后只有密码正确了, 才可以自动解锁. 如果该参数最后的值是UNLIMITED, 或需要立即给帐户解锁, 就需要DBA用手动方式来给帐户解锁.
+SQL> alter profile default limit PASSWORD_LOCK_TIME 3/(24*60);
+SQL> select username, PROFILE,LOCK_DATE,EXPIRY_DATE from dba_users where username='HR';
+
+以hr用户用错误的密码连续登三次
+
+
+过4分钟用正确的密码登陆系统，被锁账号会自动解锁
+
+
+
+
+
+password_life_time指定用户帐户的有效期, 达到这个天数的帐户叫做到期帐户. 到期帐户在登陆时会被提示口令将在多少天过期,但仍可以使用该口令, 最多宽限的天数由password_grace_time参数指定. 如果在宽限期中没有更改帐户的口令, 则帐户过期, 即叫过期帐户. 如果不更改到期帐户的口令, 就不能登陆数据库.
+
+例子：
+SQL> set time on;
+SQL> alter profile default limit password_grace_time 10 password_life_time 3;
+修改系统的时间
+root$date -s 08/01/14
+
+然后以hr用户登陆oracle
+SQL> set time on
+00:00:16 SQL> conn hr/oracle
+ERROR:
+ORA-28002: the password will expire within 10 days
+
+Connected.
+00:00:24 SQL> sho user
+USER is "HR"
+
+sql> conn / as sysdba
+sql> alter user hr identified by oracle;
+sql> conn hr/oracle
+
+
+	
+
+
+ 资源管理
+session_per_user:指定限制用户的并发会话的数目
+cpu_per_session  :单位为百分之一秒
+cpu_per_call    :指定一次调用(解析、执行和提取)的cpu时间限制, 单位为百分之一秒
+connect_time    :指定会话的总的连接时间, 以分钟为单位
+idle_time       :指定会话允许连续不活动的总的时间, 以分钟为单位, 超过该时间, 会话将断开。但是长时间运行查询和其他操作的不受此限制
+logical_reads_per_session :指定一个会话允许读的数据块的数目, 包括从内存和磁盘读的所有数据块
+logical_read_per_call :指定一次执行sql(解析、执行和提取)调用所允许读的数据块的最大数目
+
+private_sga :指定一个会话可以在共享池(sga)中所允许分配的最大空间, 以字节为单位。(该限制只在使用共享服务器结构时才有效,会话在sga中的私有空间包括私有的sql和pl/sql, 但不包括共享的sql和pl/sql)
+composite_limit: 指定一个会话的总的资源消耗, 以service units单位表示。oracle数据库以有利的方式计算cpu_per_session, connect_time,logical_reads_per_session和private-sga总的service units
+
+
+oracle 临时表的概念
+临时表的不足之处
+1、不支持lob对象
+2、不支持主外键关系

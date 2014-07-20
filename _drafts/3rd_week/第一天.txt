@@ -1,0 +1,362 @@
+
+
+----sqlplus的常用设置
+使用set sqlprompt
+sql> set sqlprompt '&_user@_connect_identifier'
+
+set linesize 400;
+column EMPLOYEE_ID format 999999 heading 'emp_id';
+column FIRST_NAME format a20;
+column LAST_NAME format a25;
+column EMAIL format a25;
+column PHONE_NUMBER format a20 heading 'phone';
+column SALARY  format 999999.99;
+column COMMISSION_PCT like salary format 99.99 heading 'cmm_pct';
+COLUMN column_name CLEAR    --清楚已设置列属性
+CLEAR COLUMNS               --重设所有列属性
+COLUMN DUMMY NOPRINT;  
+COMPUTE SUM OF SALARY ON DUMMY; 
+BREAK ON dummy;
+
+select DEPARTMENT_ID,SALARY, null dummy from employees 
+ 
+查看oracle sga各个内存组件的大小
+select component,current_size from v$sga_dynamic_components;
+select * from v$sgainfo; 
+ 
+
+查看sga中buffer cache的命中率
+ select name, round((1 - (physical_reads / (db_block_gets + consistent_gets)))*100) || '%' ratio 
+from v$buffer_pool_statistics
+where db_block_gets + consistent_get > 0 
+
+查看shared pool 的命中率
+select to_char(sum(pins-reloads)/sum(pins)*100,'99.99')||'%' from v$librarycache;
+
+ 
+----参数文件
+如果一个数据库有多个参数文件，可以用以下命令查看使用的哪个参数文件
+sql>show parameter spfile;
+如果结果为空，则表示使用pfile。否则会显示实际spile的路径。
+
+alter system set pga_aggregate_target=100M comment='test comment' scope=both;
+
+查看参数
+sql> show parameter sga
+或者
+查看视图v$spparameter 
+select value, update_comment from v$spparameter where name='shared_pool_size';
+
+transactions=(1.1 * SESSIONS) or transactions=(1.1 * ((1.5 * PROCESSES) + 22)) 
+sessions=(1.5 * PROCESSES) + 22
+
+数据字典表
+	通过create database是通过调用sql.bsq文件创建的。该文件位于$ORACLE_HOME/rdbms/admin目录，我们可以发现大部分的数据字典表几乎都是以$结尾，比如col$,tab$
+
+oracle 提供一系列的数据字典视图对数据字典表进行包装
+dictionary视图包含了全部的数据字典视图信息
+dba_views 包含了数据库中所有视图的定义信息
+sql> set long 10000000000
+sql> set pages 999
+sql> select text, from dba_views where view_name='DBA_TABLES';
+
+动态性能视图
+	就是将内存里的数据或控制文件里的数据以表的形式展现出来。它们实际都是虚表，并不是真正的表。只是让我们更好的了解数据库的性能。
+所有动态性能视图的名称都存在v$fixed_table里，而这些动态视图都是以v_$开头，属主是sys。oracle为每个动态性能视图都创建了同名词，同名词
+则是将中间的“_”去掉了，都是以v$开头。我们以v$session为例
+select owner, synonym_name, table_owner, table_name from dba_synonyms where synonym_name='V$SESSION';
+
+
+共享连接的配置
+第一步 设置初始的dispatchers 数量
+sql>alter system set dispatchers='(PROTOCOL=TCP)(dispatchers=3)';
+
+第二步 设置最大的dispatchers 数量
+SQL> alter system set max_shared_servers=5;
+
+第三步 设置初始的共享服务器进程数量
+SQL> alter system set shared_servers =5；
+
+第四步 设置共享服务器进程数量上限
+SQL> alter system set max_shared_servers=8；
+
+第五步 设置能同时使用共享连接的session个数
+SQL> alter system set shared_server_sessions=3；
+
+第六步 tnsnames.ora的配置
+orcl= 
+ (DESCRIPTION= 
+   (ADDRESS_LIST=
+     (ADDRESS=(PROTOCOL=tcp)(HOST=127.0.0.1)(PORT=1521))
+   (CONNECT_DATA=
+     (SERVICE_NAME=orcl))
+	 )
+  )
+
+-----em
+1.如果要重建Database Control， 则使用以下命令
+$ emca -deconfig dbcontrol db
+$ emca -repos drop
+
+
+2.创建Database Control, 使用以下命令
+修改用户sys和sysman 的密码
+alter user sys identified by oracle;
+alter user sysman identified by oracle;
+$ emca -repos create
+$ emca -config dbcontrol db
+
+3.启动Database Control， 使用以下命令
+先启动database，
+export ORACLE_SID=orcl
+sql> startup
+启动listener
+lsnrctl start
+
+$ emctl start dbconsole;
+
+登陆
+https://myos.oracle.com:1158/em
+
+
+4. 停止Database Control，使用以下命令
+$ emclt stop dbconsole
+
+
+------数据字典视图
+所有的数据字典视图都可以在dictionary 视图里有描述
+select table_name from dictionary where table_name like '%SYNONYM%';
+
+可以在dba_views里看到这些视图的定义
+sql> set long 100000000000
+sql> set pagesize 9999
+sql> select text from dba_views where view_name='DBA_TABLES';
+
+-----ADR
+从Oracle Database11g R1 开始，将忽略传统的…_DUMP_DEST 初始化参数。ADR 根目录又称为ADR 基目录，其位置由DIAGNOSTIC_DEST 初始化参数设定。如果省略此参数或将其保留为空，数据库将在启动时按如下方式设置DIAGNOSTIC_DEST：
+如果已设置了环境变量ORACLE_BASE，则将DIAGNOSTIC_DEST 设置为$ORACLE_BASE。
+如果未设置环境变量ORACLE_BASE，则将DIAGNOSTIC_DEST 设置为$ORACLE_HOME/log。
+
+诊断数据				以前位置								ADR位置
+前台进程跟踪文件	 user_dump_dest			 				$ADR_HOME/trace
+后台进程跟踪文件	 background_dump_dest	 				$ADR_HOME/trace
+预警日志数据    	 background_dump_dest	 				$ADR_HOME/alert&trace
+核心转储 	 		 core_dump_dest			 				$ADR_HOME/cdump
+意外事件转储 	 	 core_dump_dest/user_dump_dest		 	$ADR_HOME/incident/incdir_n
+					 
+					 
+
+使用ADRCI查看预警日志
+$adrci
+adrci> show home
+ADR Homes: 
+diag/clients/user_oracle/host_3349125520_80
+diag/clients/user_oracle/host_61728193_80
+diag/tnslsnr/myos/listener
+diag/tnslsnr/localhost/listener
+diag/rdbms/orcl/orcl
+
+adrci>show alert
+Choose the alert log from the following homes to view:
+
+1: diag/clients/user_oracle/host_3349125520_80
+2: diag/clients/user_oracle/host_61728193_80
+3: diag/tnslsnr/myos/listener
+4: diag/tnslsnr/localhost/listener
+5: diag/rdbms/orcl/orcl
+Q: to quit
+
+adrci> show alert -tail
+DIA-48449: Tail alert can only apply to single ADR home
+
+adrci> set home diag/rdbms/orcl/orcl
+adrci>  show alert -tail -f
+类似的，我们可以
+show alert -tail (默认是10条条目)
+show alert -tail -20(显示最后20个条目)
+show alert -tail -f(类似tail -f alertlog一样)
+show alert(windows中会弹出txt文本窗口显示，如已经装了MKS Toolkit，希望用vi显示，则需要先set editor vi，再show alert。)
+show alert -p "MESSAGE_TEXT like '%ORA-%'"(显示alert中关于ORA-报错的内容。其他更多的show alert的选项，可见 help show alert)
+
+
+模拟一个incident
+sql> conn hr/oracle
+SQL> create table test as select * from user_tables;
+SQL> select OBJECT_NAME,OBJECT_ID,DATA_OBJECT_ID from dba_objects where owner='HR' and object_name='TEST';
+SQL> update sys.tab$ set OBJ# = 999999 where OBJ# = 95801;
+SQL> conn / as sysdba
+SQL> alter system checkpoint;
+SQL> STARTUP FORCE;
+SQL> conn hr/oracle
+Connected.
+SQL> desc test
+
+adrci>  show problem
+adrci> show incident
+
+
+
+
+---- 表空间
+1. 创建本地管理表空间
+CREATE TABLESPACE lmtbsb DATAFILE '/u02/oracle/data/lmtbsb01.dbf' SIZE 500M EXTENT MANAGEMENT LOCAL AUTOALLOCATE;
+CREATE TABLESPACE lmtbsb DATAFILE '/u01/app/oracle/oradata/orcl/orcl/lmtbsb01.dbf' SIZE 500M EXTENT MANAGEMENT LOCAL UNIFORM SIZE 128K;
+
+
+2. 创建用户sunny， 默认表空间lmtbsb并赋予dba权限
+create user sunny identified by oracle default tablespace lmtbsb;
+
+3. 创建表t_keep
+create table t_keep as select * from dba_objects ;
+
+begin
+for i in 1 .. 30 loop
+	insert into t_keep select * from dba_objects;
+	commit;
+end loop;
+end;
+
+4.配置 keep pool
+alter system set db_keep_cache_size=800M scope=spfile;
+
+5.修改表的默认缓存池
+ alter table t_keep storage(buffer_pool keep);
+ 
+ select table_name,cache,buffer_pool from dba_tables where table_name='T_KEEP';
+ 注意： flush buffer_cache 会清空keep cache
+ 
+ 
+ exec dbms_stats.gather_table_stats('sunny','t_keep',estimate_percent=>100,method_opt=>'for all indexed columns size 254');
+  exec dbms_stats.gather_table_stats('sunny','t_keep',estimate_percent=>100,method_opt=>'for all  columns size 254');
+
+ 
+ select ENDPOINT_ACTUAL_VALUE, ENDPOINT_NUMBER, ENDPOINT_NUMBER-lag(ENDPOINT_NUMBER,1,0) over (order by ENDPOINT_NUMBER) as frequency 
+ from  dba_tab_histograms  where table_name='T_KEEP' and column_name='OBJECT_NAME' order by ENDPOINT_NUMBER
+ 
+ select to_char(ENDPOINT_VALUE) from  dba_tab_histograms  where table_name='T_KEEP' and column_name='OBJECT_NAME' 
+ 
+ 
+ 
+ 用户安全管理
+ 管理用户安全
+with admin option 和with grant option
+- 两个受赋予者，都可以把权限或者role 再赋予other users
+- 两个option 都可以对DBA 和APP ADMIN 带来方便性，但同时，都带来不安全的因素
+不同点：
+- with admin option 只能在赋予 system privilege 的时使用
+- with grant option 只能在赋予 object privilege 的时使用
+- 撤消带有admin option 的system privileges 时，连带的权限将保留
+
+sys 用户的密码文件验证
+实验一：创建密码文件
+step 1 : orapwd file=$ORACLE_HOME/
+step 1： $ORACLE_HOME/network/admin/sqlnet.ora 文件里添加如下记录
+
+实验二： 创建用户
+CREATE USER "TEST" PROFILE "DEFAULT" IDENTIFIED BY oracle PASSWORD EXPIRE DEFAULT TABLESPACE "EXAMPLE" TEMPORARY TABLESPACE "TEMP" ACCOUNT UNLOCK;
+GRANT "CONNECT" TO "TEST";
+
+CREATE USER "sunny" PROFILE "DEFAULT" IDENTIFIED BY "oracle" DEFAULT TABLESPACE "USERS" TEMPORARY TABLESPACE "TEMP";
+ GRANT "CONNECT" TO "sunny";
+
+CREATE USER "HJ" PROFILE "DEFAULT" IDENTIFIED BY "oracle" DEFAULT TABLESPACE "USERS" TEMPORARY TABLESPACE "TEMP";
+GRANT "CONNECT" TO "HJ";
+
+CREATE USER tom PROFILE "DEFAULT" IDENTIFIED BY "oracle" DEFAULT TABLESPACE "USERS" TEMPORARY TABLESPACE "TEMP";
+  GRANT "CONNECT" TO "tom";
+
+CREATE USER "jimmy" PROFILE "DEFAULT" IDENTIFIED BY "oracle" DEFAULT TABLESPACE "USERS" TEMPORARY TABLESPACE "TEMP";
+ GRANT "CONNECT" TO " jimmy";
+
+实验三： 外部认证
+step 1. 把参数os_authent_prefix的置为kong
+ alter system set os_authent_prefix='' scope=spfile;
+
+step 2. 重启db
+startup force;
+
+step 3.创建用户oracle
+create user oracle identified externally;
+grant connect to oracle;
+
+step 4. 登陆
+conn / 
+
+实验四： 账号锁定
+step 1. alter user sunny account lock;
+
+实验五： 解除账号锁定
+step 1. alter user sunny account unlock;
+
+实验六： 创建角色TEST_ROLE,并把scott用户下的表读改写的权限都给它。
+step 1: 
+CREATE ROLE "TEST_ROLE" NOT IDENTIFIED;
+step 2： 赋权
+GRANT ALTER ON "SCOTT"."BONUS" TO "TEST_ROLE";
+GRANT DELETE ON "SCOTT"."BONUS" TO "TEST_ROLE";
+GRANT INSERT ON "SCOTT"."BONUS" TO "TEST_ROLE";
+GRANT SELECT ON "SCOTT"."BONUS" TO "TEST_ROLE";
+GRANT UPDATE ON "SCOTT"."BONUS" TO "TEST_ROLE";
+GRANT ALTER ON "SCOTT"."DEPT" TO "TEST_ROLE";
+GRANT DELETE ON "SCOTT"."DEPT" TO "TEST_ROLE";
+GRANT INSERT ON "SCOTT"."DEPT" TO "TEST_ROLE";
+GRANT SELECT ON "SCOTT"."DEPT" TO "TEST_ROLE";
+GRANT UPDATE ON "SCOTT"."DEPT" TO "TEST_ROLE";
+GRANT ALTER ON "SCOTT"."EMP" TO "TEST_ROLE";
+GRANT DELETE ON "SCOTT"."EMP" TO "TEST_ROLE";
+GRANT INSERT ON "SCOTT"."EMP" TO "TEST_ROLE";
+GRANT SELECT ON "SCOTT"."EMP" TO "TEST_ROLE";
+GRANT UPDATE ON "SCOTT"."EMP" TO "TEST_ROLE";
+GRANT ALTER ON "SCOTT"."SALGRADE" TO "TEST_ROLE";
+GRANT DELETE ON "SCOTT"."SALGRADE" TO "TEST_ROLE";
+GRANT INSERT ON "SCOTT"."SALGRADE" TO "TEST_ROLE";
+GRANT SELECT ON "SCOTT"."SALGRADE" TO "TEST_ROLE";
+GRANT UPDATE ON "SCOTT"."SALGRADE" TO "TEST_ROLE";
+GRANT "CONNECT" TO "TEST_ROLE";
+GRANT "RESOURCE" TO "TEST_ROLE";
+
+
+实验 七 测试admin option
+step 1. 把角色赋给sunny，在sys用户下执行下面的语句
+grant test_role to sunny with admin option;
+
+step 2. sunny 用户登陆进数据库，执行下面的语句
+conn sunny/oracle
+
+step 3. sunny 用户把角色赋给hj;
+grant test_role to hj
+
+step 4. 以hj用户登陆进数据库,执行下面的语句
+select * from scott.dept;
+
+step 5. 回收sunny的test_role 角色
+revoke test_role from sunny;
+
+step 6. 以hj用户登陆进数据库,执行下面的语句
+select * from scott.dept;
+虽然sunny用户的test¬_role的角色已经被回收了，但由于他的利用admin option选项。所以hj的test_role角色没有被级联回收。
+发现这条sql语句可以正常执行。
+
+
+实验 八 测试grant option
+step 1. 把角色赋给sunny，在sys用户下执行下面的语句
+GRANT SELECT ON "SCOTT"."EMP" TO sunny with grant option;
+
+step 2. sunny 用户登陆进数据库，执行下面的语句
+conn sunny/oracle
+
+step 3. sunny 用户把角色赋给hj;
+GRANT SELECT ON "SCOTT"."EMP" TO to tom
+
+step 4. 以hj用户登陆进数据库,执行下面的语句
+select * from "SCOTT"."EMP";
+
+step 5. 回收sunny的test_role 角色
+revoke test_role from sunny;
+
+step 6. 以hj用户登陆进数据库,执行下面的语句
+select * from "SCOTT"."EMP";
+会报这个表不存在这个错。
+
+
+
