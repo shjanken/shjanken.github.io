@@ -28,3 +28,18 @@
 - 查看软解析命中率
 
         select sum(pinhits)/sum(pins)*100 from v$librarycache;
+
+----------
+
+- 查看 `PGA` 内存大小设置的系统推荐值。（注意： 该 `sql` 语句需要在 `oracle` 数据库稳定运行一段时间以后在执行。才能得到准确的定义）
+
+        select pga_target_for_estimate/1024/1024 || 'M' "Estimate PGA target",
+            estd_pga_cache_hit_percentage "Cache hit(%)",
+            estd_extra_byte_rw/1024/1024 || "M" "Extra Read/Write",
+            estd_overalloc_count "Over alloc count"
+        From v$pga_target_advice;
+
+- 查看 `oracle` 的段的信息
+        
+        select * from dba_segments;
+
