@@ -1,4 +1,11 @@
+
+---
+layout: post
+title: grub相关知识
+---
+
 1. `tee` 命令的使用: `tee` 命令可以接受一个`stdin` 并将该 `stdin` 保存到一个副本中， 然后将该 `stdin` 作为 自己（`tee`命令）的 `stdout` 输出
+
         
         # 接受前一个命令的输出放入文件，并将该输出继续传入下一个命令的stdin
         echo 'hello world' | tee out.txt | cat -n -
