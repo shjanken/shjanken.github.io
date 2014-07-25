@@ -1,7 +1,7 @@
 
 ---
-layout: post
-title: grub相关知识
+    layout: post
+    title: grub相关知识
 ---
 
 1. `tee` 命令的使用: `tee` 命令可以接受一个`stdin` 并将该 `stdin` 保存到一个副本中， 然后将该 `stdin` 作为 自己（`tee`命令）的 `stdout` 输出
