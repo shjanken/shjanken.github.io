@@ -1,4 +1,3 @@
-
 ---
     layout: post
     title: grub相关知识
