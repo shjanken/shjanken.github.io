@@ -19,8 +19,10 @@
 
 
 - 获取对象的方法的引用
-
+        
+        ```python
         li = ["larry","Curly"]
         li.pop //获取 li的pop方法的引用. 注意!并不调用该方法
         getattr(li,"pop") //同上
         getattr(li,"append")("Moe") //调用li.append("Moe")
+        ````
