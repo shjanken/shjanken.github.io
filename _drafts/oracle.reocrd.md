@@ -42,4 +42,3 @@
 - 查看 `oracle` 的段的信息
         
         select * from dba_segments;
-

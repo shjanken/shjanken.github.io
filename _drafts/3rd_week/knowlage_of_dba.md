@@ -53,6 +53,8 @@
 
         show parameter recovery
 
+ORACLE企业管理器
+---
 
 `oracle em` 的重新安装
 
@@ -74,3 +76,5 @@
           1. 启动数据库
           2. 启动监听
           3. emctl start dbconsole;
+
+    4. 启动 `lisnter` :
